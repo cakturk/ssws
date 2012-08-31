@@ -3,7 +3,8 @@
 #############################################################################
 CC            = gcc
 DEFINES       =
-CFLAGS        = -pipe -g -Wall -Wp,-D_FORTIFY_SOURCE=2 -mtune=generic -Wall $(DEFINES)
+CFLAGS        = -pipe -g -Wall -Wp,-D_FORTIFY_SOURCE=2 -mtune=generic \
+		-Wall -Wno-unused-function $(DEFINES)
 INCPATH       =
 LINK          = gcc
 LFLAGS        =

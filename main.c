@@ -20,7 +20,10 @@ int main(int argc, char **argv)
     if (port < 1 || port > 65535)
         error_exit("Invalid port number\n");
 
-    printf("Whooaa: %d\n", ssws_init());
+    if (ssws_init(argv[1], NULL) == -1)
+        error_exit("ssws_init failed!\n");
+
+    printf("Whooaa:\n");
 
     return 0;
 }
