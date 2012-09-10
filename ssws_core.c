@@ -1,153 +1,43 @@
+/*
+ * Copyright (C) Cihangir Akturk 2012
+ *
+ * This file is part of chngr's simple stupid web server (ssws).
+ *
+ * ssws is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * ssws is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with ssws.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <unistd.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h> /* former <arpa/inet.h>*/
+#include <netdb.h>
 
 #include <string.h>
 #include <stdio.h>
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netdb.h>
+#include "http_header_parser.h"
 
 #define BUFSIZE 4096
 
-/* Request types eg(GET, HEAD..) */
-#define GET 0
-#define HEAD 1
-#define NOT_SUPPORTED 2
-#define OK 200
-#define BAD_REQUEST 400
-#define FORBIDDEN 403
-#define NOT_FOUND 404
-
-#define SRV_NAME "chngr's ssws"
-#define SRV_VERSION "0.1"
-#define SRV_FULL_NAME SRV_NAME "/" SRV_VERSION
-
-#define HEADER_STR \
-    "HTTP/1.1 %d %s\n"          \
-    "Server: %s\n"              \
-    "Content-Length: %zu\n"     \
-    "Connection: close\n"       \
-    "Content-Type: %s\n\n"
-
-struct request_metod {
-    char *name;
-    int   value;
-};
-
-static struct request_metod supported_methods[] = {
-    { "GET" , GET  },
-    { "HEAD", HEAD },
-    { NULL  , 0    }
-};
-
-struct mime_type {
-    char *ext;
-    char *file_type;
-};
-
-static struct mime_type supported_mime_types[] = {
-    { "html", "text/html" },
-    { "htm" , "text/html" },
-    { "jpg" , "image/jpg" },
-    { "jpeg", "image/jpeg"},
-    { "png" , "image/png" },
-    { "gif" , "image/gif" },
-    { "zip" , "image/zip" },
-    { "gz"  , "image/gz"  },
-    { "tar" , "image/tar" },
-    { NULL  , NULL        }
-};
-
-struct http_header {
-    int request_type;
-    char *request_path;
-    char *host;
-    char *user_agent;
-};
-
-static char *get_next_line(char **next, char *end)
+static inline size_t get_fsize(int fd)
 {
-    char *str = *next;
-    char *result = str;
-
-    if (!str || *(str+1) == '\n')
-        return NULL;
-
-    *next = NULL;
-
-    for (; str < end; ++str) {
-        if (*str == '\n') {
-            *str = '\0';
-            if (str + 1 < end && *(str + 1) != '\0')
-                *next = str + 1;
-            break;
-        }
-    }
-
-    return result;
-}
-
-static int parse_header(struct http_header *hdr,
-                        char *hdr_data,
-                        size_t size)
-{
-    struct request_metod *method;
-    char *i, *next, *end;
-    int result = -1;
-
-    end = hdr_data + size;
-    next = hdr_data;
-
-    i = get_next_line(&next, end);
-    if (!i)
-        goto out;
-    if((i = strtok(i, " ")) == NULL)
-        goto out;
-    for (method = supported_methods; method != NULL; ++method) {
-        if (strncmp(i, method->name, strlen(method->name)) == 0) {
-            hdr->request_type = method->value;
-            break;
-        }
-    }
-
-    if((i = strtok(NULL, " ")) == NULL)
-        goto out;
-    hdr->request_path = i + 1;
-    /* We got enough header data */
-    result = 0;
-
-    if ((i = get_next_line(&next, end)) == NULL)
-        goto out;
-    if((i = strtok(i, " ")) == NULL)
-        goto out;
-    if (strncmp(i, "Host:", strlen("Host:")) == 0) {
-        i = strtok(NULL, " ");
-        hdr->host = i;
-    }
-
-    while ((i = get_next_line(&next, end))) {
-        char *token = strtok(i, " ");
-        int found = 0;
-        while (token) {
-            if (strncmp(token, "User-Agent:",
-                        strlen("User-Agent:")) == 0)
-                found = 1;
-
-            if (found) {
-                hdr->user_agent = token + strlen(token) + 1;
-                goto out;
-            } else {
-                token = strtok(NULL, " ");
-            }
-        }
-    }
-
-out:
-    return result;
+    size_t len = (size_t)lseek(fd, 0, SEEK_END);
+    lseek(fd, 0, SEEK_SET);
+    return len;
 }
 
 static int get_server_fd(const char *port)
@@ -185,56 +75,30 @@ static int get_server_fd(const char *port)
     return fd;
 }
 
-static inline size_t get_fsize(int fd)
-{
-    size_t len = (size_t)lseek(fd, 0, SEEK_END);
-    lseek(fd, 0, SEEK_SET);
-    return len;
-}
-
-static inline char *getfileext(char *fname)
-{
-    char *ret = strrchr(fname, '.');
-    if (ret)
-        ret = ret + 1;
-
-    return ret;
-}
-
-static char *mimestr(char *file_name)
-{
-    struct mime_type *m = supported_mime_types;
-    char *ext = getfileext(file_name);
-    size_t len;
-
-    if (ext) {
-        len = strlen(ext);
-        for (; m->ext != NULL; ++m)
-            if (strncmp(m->ext, ext, len) == 0)
-                return m->file_type;
-    }
-
-    return NULL;
-}
 
 static int handle_request(int sock_fd, struct http_header *hdr)
 {
     static char out_buffer[BUFSIZE];
     int fd, status = OK;
     size_t len;
+    /* define MAXMIMELEN for convenience */
+    char buf[32];
 
     /* Don't allow access to parent dirs */
     if (strstr(hdr->request_path, ".."))
         status = FORBIDDEN;
 
+    filename(buf, 32, hdr->request_path);
+
     if (status == OK) {
-        char *mime = mimestr(hdr->request_path);
-        fd = open(hdr->request_path, O_RDONLY);
-        if (fd != -1 && mime) {
+        fd = open(buf, O_RDONLY);
+        const char *mim = mimestr(hdr->request_path);
+
+        if (fd != -1) {
             len = get_fsize(fd);
             snprintf(out_buffer, BUFSIZE, HEADER_STR,
                      OK, "OK", SRV_FULL_NAME, len,
-                     mime);
+                     mim);
             write(sock_fd, out_buffer, strlen(out_buffer));
         } else {
             status = NOT_FOUND;
@@ -283,12 +147,12 @@ int ssws_init(const char *port, const char *doc_root)
             close(sock_fd);
             return -1;
         }
-        printf("Got connection!\n");
+        //printf("Got connection!\n");
         size = read(cli_fd, buf, BUFSIZE);
 
         if (size > 0) {
             buf[size] = '\0';
-            printf("Date from wire:\n%s\n", buf);
+            //printf("Date from wire:\n%s\n", buf);
             struct http_header header;
             parse_header(&header, buf, BUFSIZ);
             handle_request(cli_fd, &header);

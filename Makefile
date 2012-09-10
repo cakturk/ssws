@@ -26,7 +26,7 @@ DEL_DIR       = rmdir
 MOVE          = mv -f
 CHK_DIR_EXISTS= test -d
 MKDIR         = mkdir -p
-OBJECTS       = main.o ssws_core.o
+OBJECTS       = main.o http_header_parser.o ssws_core.o
 EXE           = ssws
 
 first: all
