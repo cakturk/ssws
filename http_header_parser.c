@@ -42,16 +42,17 @@ struct mime_type {
 };
 
 static struct mime_type supported_mime_types[] = {
-    { "html", "text/html" },
-    { "htm" , "text/html" },
-    { "jpg" , "image/jpg" },
-    { "jpeg", "image/jpeg"},
-    { "png" , "image/png" },
-    { "gif" , "image/gif" },
-    { "zip" , "image/zip" },
-    { "gz"  , "image/gz"  },
-    { "tar" , "image/tar" },
-    { NULL  , NULL        }
+    { "html", "text/html"         },
+    { "htm" , "text/html"         },
+    { "jpg" , "image/jpg"         },
+    { "jpeg", "image/jpeg"        },
+    { "png" , "image/png"         },
+    { "gif" , "image/gif"         },
+    { "tgz" , "application/x-gz"  },
+    { "gz"  , "application/x-gz"  },
+    { "tar" , "application/x-tar" },
+    { "zip" , "application/zip"   },
+    { NULL  , NULL                }
 };
 
 struct server_data {
