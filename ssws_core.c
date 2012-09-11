@@ -26,6 +26,7 @@
 #include <netinet/in.h> /* former <arpa/inet.h>*/
 #include <netdb.h>
 
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -152,16 +153,27 @@ int ssws_init(const char *port, const char *doc_root)
 
         if (size > 0) {
             buf[size] = '\0';
-            //printf("Date from wire:\n%s\n", buf);
-            struct http_header header;
-            parse_header(&header, buf, BUFSIZ);
-            handle_request(cli_fd, &header);
-            printf("heaa: %d, %s, %s\n",
-                   header.request_type,
-                   header.request_path,
-                   header.user_agent);
+
+            pid_t pid = fork();
+            if (pid < 0)
+                exit(EXIT_FAILURE);
+
+            /* child process */
+            if (pid == 0) {
+                close(sock_fd);
+
+                struct http_header header;
+                parse_header(&header, buf, BUFSIZ);
+                handle_request(cli_fd, &header);
+                printf("header:\n%d, %s, %s\n",
+                       header.request_type,
+                       header.request_path,
+                       header.user_agent);
+                exit(EXIT_SUCCESS);
+            } else {
+                close(cli_fd);
+            }
         }
-        close(cli_fd);
     }
     close(sock_fd);
 

@@ -17,6 +17,8 @@
  * along with ssws.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <signal.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -40,6 +42,10 @@ int main(int argc, char **argv)
     port = atoi(argv[1]);
     if (port < 1 || port > 65535)
         error_exit("Invalid port number\n");
+
+    /* Ignore child process state changes */
+    signal(SIGCHLD, SIG_IGN);
+    signal(SIGHUP, SIG_IGN);
 
     if (ssws_init(argv[1], NULL) == -1)
         error_exit("ssws_init failed!\n");
