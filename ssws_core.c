@@ -31,8 +31,9 @@
 #include <stdio.h>
 
 #include "http_header_parser.h"
+#include "server_mem.h"
 
-#define BUFSIZE 4096
+static struct server_buf app_buf;
 
 static inline size_t get_fsize(int fd)
 {
@@ -76,23 +77,40 @@ static int get_server_fd(const char *port)
     return fd;
 }
 
-
-static int handle_request(int sock_fd, struct http_header *hdr)
+/*
+ * Send all chunks in one go
+ * On success, number of bytes sent is returned
+ * on error, -1 returned
+ */
+static size_t sendall(int fd, char *buf, size_t n)
 {
-    static char out_buffer[BUFSIZE];
+    size_t len, nsent = 0;
+
+    do {
+        len = write(fd, buf + nsent, n - nsent);
+        if (len == -1)
+            break;
+        nsent += len;
+    } while (nsent < n);
+
+    return len == -1 ? -1 : nsent;
+}
+
+static int handle_request(int sock_fd, struct http_header *hdr,
+                          struct server_buf *mem)
+{
+    char *out_buffer = mem->out_buf;
     int fd, status = OK;
     size_t len;
-    /* define MAXMIMELEN for convenience */
-    char buf[32];
 
     /* Don't allow access to parent dirs */
     if (strstr(hdr->request_path, ".."))
         status = FORBIDDEN;
 
-    filename(buf, 32, hdr->request_path);
+    filename(out_buffer, 32, hdr->request_path);
 
     if (status == OK) {
-        fd = open(buf, O_RDONLY);
+        fd = open(out_buffer, O_RDONLY);
         const char *mim = mimestr(hdr->request_path);
 
         if (fd != -1) {
@@ -100,7 +118,7 @@ static int handle_request(int sock_fd, struct http_header *hdr)
             snprintf(out_buffer, BUFSIZE, HEADER_STR,
                      OK, "OK", SRV_FULL_NAME, len,
                      mim);
-            write(sock_fd, out_buffer, strlen(out_buffer));
+            sendall(sock_fd, out_buffer, strlen(out_buffer));
         } else {
             status = NOT_FOUND;
         }
@@ -110,7 +128,7 @@ static int handle_request(int sock_fd, struct http_header *hdr)
     case GET:
         if (status == OK) {
             while ((len = read(fd, out_buffer, BUFSIZE)) > 0)
-                write(sock_fd, out_buffer, len);
+                sendall(sock_fd, out_buffer, len);
         }
         break;
     case HEAD:
@@ -125,7 +143,6 @@ static int handle_request(int sock_fd, struct http_header *hdr)
 
 int ssws_init(const char *port, const char *doc_root)
 {
-    char buf[BUFSIZE];
     struct sockaddr cli_addr;
     size_t size;
     socklen_t cli_sock_len;
@@ -148,11 +165,11 @@ int ssws_init(const char *port, const char *doc_root)
             close(sock_fd);
             return -1;
         }
-        //printf("Got connection!\n");
-        size = read(cli_fd, buf, BUFSIZE);
+
+        size = read(cli_fd, app_buf.in_buf, BUFSIZE);
 
         if (size > 0) {
-            buf[size] = '\0';
+            app_buf.in_buf[size] = '\0';
 
             pid_t pid = fork();
             if (pid < 0)
@@ -163,8 +180,8 @@ int ssws_init(const char *port, const char *doc_root)
                 close(sock_fd);
 
                 struct http_header header;
-                parse_header(&header, buf, BUFSIZ);
-                handle_request(cli_fd, &header);
+                parse_header(&header, app_buf.in_buf, BUFSIZE);
+                handle_request(cli_fd, &header, &app_buf);
                 printf("header:\n%d, %s, %s\n",
                        header.request_type,
                        header.request_path,
