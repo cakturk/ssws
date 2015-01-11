@@ -1,51 +1,34 @@
 #############################################################################
 # Makefile for building: ssws (simple stupid web server)
 #############################################################################
-CC            = gcc
-DEFINES       =
-CFLAGS        = -pipe -g -Wall -Wp,-D_FORTIFY_SOURCE=2 -mtune=generic \
-		-Wall -Wno-unused-function $(DEFINES)
-INCPATH       =
-LINK          = gcc
-LFLAGS        =
-LIBS          =
-AR            = ar cqs
-TAR           = tar -cf
-COMPRESS      = gzip -9f
-COPY          = cp -f
-SED           = sed
-COPY_FILE     = $(COPY)
-COPY_DIR      = $(COPY) -r
-STRIP         = strip --strip-unneeded
-INSTALL_FILE  = install -m 644 -p
-INSTALL_DIR   = $(COPY_DIR)
-INSTALL_PROGRAM = install -m 755 -p
-DEL_FILE      = rm -f
-SYMLINK       = ln -f -s
-DEL_DIR       = rmdir
-MOVE          = mv -f
-CHK_DIR_EXISTS= test -d
-MKDIR         = mkdir -p
-OBJECTS       = main.o http_header_parser.o ssws_core.o
-EXE           = ssws
+CFLAGS = -g -O2 -Wall -pipe
+OBJECTS = main.o http_header_parser.o ssws_core.o
+PROGRAM = ssws
 
-first: all
+all: $(PROGRAM)
 
-####### Implicit rules
-.SUFFIXES: .o .c
+dep_files := $(foreach f, $(OBJECTS),$(dir $f).depend/$(notdir $f).d)
+dep_dirs := $(addsuffix .depend,$(sort $(dir $(OBJECTS))))
 
-.c.o:
-	$(CC) -c $(CFLAGS) $(INCPATH) -o "$@" "$<"
+$(dep_dirs):
+	@mkdir -p $@
 
+missing_dep_dirs := $(filter-out $(wildcard $(dep_dirs)),$(dep_dirs))
+dep_file = $(dir $@).depend/$(notdir $@).d
+dep_args = -MF $(dep_file) -MQ $@ -MMD -MP
 
-all: Makefile $(EXE)
+dep_files_present := $(wildcard $(dep_files))
+ifneq ($(dep_files_present),)
+include $(dep_files_present)
+endif
 
-$(EXE):  $(OBJECTS)
-	$(LINK) $(LFLAGS) -o $(EXE) $(OBJECTS) $(LIBS)
+%.o: %.c $(missing_dep_dirs)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $(dep_args) $< -o $@
 
-release: $(EXE)
-	$(STRIP) $(EXE)
+$(PROGRAM): $(OBJECTS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(PROGRAM) $(OBJECTS) $(LDLIBS)
 
+.PHONY: clean
 clean:
-	-$(DEL_FILE) $(OBJECTS)
-	-$(DEL_FILE) *~ core.*
+	-$(RM) $(OBJECTS) *~ core.*
+	-$(RM) -r $(dep_dirs)
