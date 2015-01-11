@@ -5,6 +5,13 @@ CFLAGS = -g -O2 -Wall -pipe
 OBJECTS = main.o http_header_parser.o ssws_core.o
 PROGRAM = ssws
 
+ifndef ($(findstring $(MAKEFLAGS),s),s)
+ifndef V
+	E_CC	= @echo ' CC    '$@;
+	E_LD	= @echo ' LD    '$@;
+endif
+endif
+
 all: $(PROGRAM)
 
 dep_files := $(foreach f, $(OBJECTS),$(dir $f).depend/$(notdir $f).d)
@@ -23,10 +30,10 @@ include $(dep_files_present)
 endif
 
 %.o: %.c $(missing_dep_dirs)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c $(dep_args) $< -o $@
+	$(E_CC)$(CC) $(CFLAGS) $(CPPFLAGS) -c $(dep_args) $< -o $@
 
 $(PROGRAM): $(OBJECTS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $(PROGRAM) $(OBJECTS) $(LDLIBS)
+	$(E_LD)$(CC) $(CFLAGS) $(LDFLAGS) -o $(PROGRAM) $(OBJECTS) $(LDLIBS)
 
 .PHONY: clean
 clean:
