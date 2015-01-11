@@ -3,3 +3,4 @@
 *.vim
 core.*
 ssws
+.depend/
