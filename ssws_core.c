@@ -96,6 +96,16 @@ static size_t sendall(int fd, char *buf, size_t n)
     return len == -1 ? -1 : nsent;
 }
 
+static int setnonblocking(int fd)
+{
+	int flag;
+
+	flag = fcntl(fd, F_GETFL);
+	if (flag == -1)
+		return -1;
+	return fcntl(fd, F_SETFL, O_NONBLOCK);
+}
+
 static int handle_request(int sock_fd, struct http_header *hdr,
                           struct server_buf *mem)
 {
