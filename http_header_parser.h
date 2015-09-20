@@ -51,6 +51,7 @@ struct http_header {
     char *user_agent;
 };
 
+extern int set_document_root(const char *docroot);
 extern int filename(char *buf, size_t size, const char *request_path);
 extern int parse_header(struct http_header *hdr,
                         char *hdr_data,

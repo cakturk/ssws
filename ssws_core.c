@@ -20,6 +20,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -110,14 +111,20 @@ static int handle_request(int sock_fd, struct http_header *hdr,
                           struct server_buf *mem)
 {
     char *out_buffer = mem->out_buf;
-    int fd, status = OK;
+    int fd, err, status = OK;
     size_t len;
 
     /* Don't allow access to parent dirs */
     if (strstr(hdr->request_path, ".."))
         status = FORBIDDEN;
 
-    filename(out_buffer, 32, hdr->request_path);
+    err = filename(out_buffer, BUFSIZE, hdr->request_path);
+    if (err == FORBIDDEN || err == -1) {
+        fprintf(stderr,
+                "could not designate a file name from the request URI: %s\n",
+                hdr->request_path);
+        return -1;
+    }
 
     if (status == OK) {
         fd = open(out_buffer, O_RDONLY);
@@ -151,7 +158,7 @@ static int handle_request(int sock_fd, struct http_header *hdr,
     return 0;
 }
 
-int ssws_init(const char *port, const char *doc_root)
+int ssws_init(const char *port, const char *document_root)
 {
     struct sockaddr cli_addr;
     size_t size;
@@ -161,6 +168,12 @@ int ssws_init(const char *port, const char *doc_root)
     if (sock_fd <= 0)
         return sock_fd;
 
+    errno = 0;
+    if (set_document_root(document_root)) {
+        fprintf(stderr, "%s: could not set document root, errno: %d - %s\n",
+                __func__, errno, strerror(errno));
+        return -1;
+    }
 
     if (listen(sock_fd, 12) != 0) {
         printf("listen: %d failed\n", sock_fd);

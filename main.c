@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     signal(SIGCHLD, SIG_IGN);
     signal(SIGHUP, SIG_IGN);
 
-    if (ssws_init(argv[1], NULL) == -1)
+    if (ssws_init(argv[1], argv[2]) == -1)
         error_exit("ssws_init failed!\n");
 
     printf("Whooaa:\n");

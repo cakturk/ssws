@@ -20,10 +20,38 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <limits.h> /* PATH_MAX */
+
+#include <stdlib.h> /* malloc, realpath */
 #include <string.h>
 #include <stdio.h>
 
 #include "http_header_parser.h"
+
+static char *doc_root;
+
+int set_document_root(const char *docroot)
+{
+    struct stat sb;
+    char abs_path[PATH_MAX];
+    int err;
+
+    if (!docroot || docroot[0] == '\0')
+        return -1;
+
+    err = stat(docroot, &sb);
+    if (err || !S_ISDIR(sb.st_mode))
+        return -1;
+
+    if (!realpath(docroot, abs_path))
+        return -1;
+
+    doc_root = strdup(abs_path);
+
+    printf("set document root to %s\n", doc_root);
+
+    return 0;
+}
 
 struct request_metod {
     const char *name;
@@ -160,24 +188,29 @@ int filename(char *buf, size_t size, const char *request_path)
     if (strstr(request_path, ".."))
         return FORBIDDEN;
 
-    if (stat(request_path, &sb) == 0)
+    if (snprintf(buf, size, "%s/%s", doc_root, request_path) >= size)
+        return -1;
+
+    if (stat(buf, &sb) == 0)
         isdir = S_ISDIR(sb.st_mode);
 
-    len = strlen(request_path);
+    len = strlen(buf);
 
-    if (len == 0 && request_path[0] == '\0') {
-        strncpy(buf, "index.html", size);
-    } else if (len && isdir) {
-        if (*(request_path + len - 1) == '/')
-            snprintf(buf, size, "%s%s",
-                     request_path,
-                     "index.html");
+    if (isdir) {
+        const char *dir_index;
+
+        if (len > 0 && *(request_path + len - 1) == '/')
+            dir_index = "index.html";
         else
-            snprintf(buf, size, "%s%s",
+            dir_index = "/index.html";
+        if (snprintf(buf, size, "%s%s%s",
+                     doc_root,
                      request_path,
-                     "/index.html");
+                     dir_index) >= size)
+            return -1;
     } else {
-        strncpy(buf, request_path, size);
+        if (snprintf(buf, size, "%s/%s", doc_root, request_path) >= size)
+            return -1;
     }
 
     return OK;
