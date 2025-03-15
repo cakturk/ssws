@@ -126,8 +126,8 @@ static int handle_request(int sock_fd, struct http_header *hdr,
         return -1;
     }
 
+    fd = open(out_buffer, O_RDONLY);
     if (status == OK) {
-        fd = open(out_buffer, O_RDONLY);
         const char *mim = mimestr(hdr->request_path);
 
         if (fd != -1) {

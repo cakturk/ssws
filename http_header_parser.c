@@ -58,7 +58,7 @@ struct request_metod {
     int value;
 };
 
-static struct request_metod supported_methods[] = {
+static const struct request_metod supported_methods[] = {
     { "GET" , GET  },
     { "HEAD", HEAD },
     { NULL  , 0    }
@@ -69,7 +69,7 @@ struct mime_type {
     const char *file_type;
 };
 
-static struct mime_type supported_mime_types[] = {
+static const struct mime_type supported_mime_types[] = {
     { "html", "text/html"         },
     { "htm" , "text/html"         },
     { "jpg" , "image/jpg"         },
@@ -114,7 +114,7 @@ int parse_header(struct http_header *hdr,
                  char *hdr_data,
                  size_t size)
 {
-    struct request_metod *method;
+    const struct request_metod *method;
     char *i, *next, *end;
     int result = -1;
 
@@ -218,7 +218,7 @@ int filename(char *buf, size_t size, const char *request_path)
 
 const char *mimestr(const char *file_name)
 {
-    struct mime_type *m = supported_mime_types;
+    const struct mime_type *m = supported_mime_types;
     char *ext = getfileext(file_name);
     size_t len;
 
