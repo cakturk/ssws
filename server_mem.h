@@ -23,8 +23,8 @@
 #define BUFSIZE 4096
 
 struct server_buf {
-    char in_buf[BUFSIZE];
-    char out_buf[BUFSIZE];
+	char in_buf[BUFSIZE];
+	char out_buf[BUFSIZE];
 };
 
 

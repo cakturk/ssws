@@ -32,202 +32,202 @@ static char *doc_root;
 
 int set_document_root(const char *docroot)
 {
-    struct stat sb;
-    char abs_path[PATH_MAX];
-    int err;
+	struct stat sb;
+	char abs_path[PATH_MAX];
+	int err;
 
-    if (!docroot || docroot[0] == '\0')
-        return -1;
+	if (!docroot || docroot[0] == '\0')
+		return -1;
 
-    err = stat(docroot, &sb);
-    if (err || !S_ISDIR(sb.st_mode))
-        return -1;
+	err = stat(docroot, &sb);
+	if (err || !S_ISDIR(sb.st_mode))
+		return -1;
 
-    if (!realpath(docroot, abs_path))
-        return -1;
+	if (!realpath(docroot, abs_path))
+		return -1;
 
-    doc_root = strdup(abs_path);
+	doc_root = strdup(abs_path);
 
-    printf("set document root to %s\n", doc_root);
+	printf("set document root to %s\n", doc_root);
 
-    return 0;
+	return 0;
 }
 
 struct request_metod {
-    const char *name;
-    int value;
+	const char *name;
+	int value;
 };
 
 static const struct request_metod supported_methods[] = {
-    { "GET" , GET  },
-    { "HEAD", HEAD },
-    { NULL  , 0    }
+	{ "GET" , GET  },
+	{ "HEAD", HEAD },
+	{ NULL  , 0    }
 };
 
 struct mime_type {
-    const char *ext;
-    const char *file_type;
+	const char *ext;
+	const char *file_type;
 };
 
 static const struct mime_type supported_mime_types[] = {
-    { "html", "text/html"         },
-    { "htm" , "text/html"         },
-    { "jpg" , "image/jpg"         },
-    { "jpeg", "image/jpeg"        },
-    { "png" , "image/png"         },
-    { "gif" , "image/gif"         },
-    { "tgz" , "application/x-gz"  },
-    { "gz"  , "application/x-gz"  },
-    { "tar" , "application/x-tar" },
-    { "zip" , "application/zip"   },
-    { NULL  , NULL                }
+	{ "html", "text/html"         },
+	{ "htm" , "text/html"         },
+	{ "jpg" , "image/jpg"         },
+	{ "jpeg", "image/jpeg"        },
+	{ "png" , "image/png"         },
+	{ "gif" , "image/gif"         },
+	{ "tgz" , "application/x-gz"  },
+	{ "gz"  , "application/x-gz"  },
+	{ "tar" , "application/x-tar" },
+	{ "zip" , "application/zip"   },
+	{ NULL  , NULL                }
 };
 
 struct server_data {
-    struct http_header *header;
-    char *payload;
+	struct http_header *header;
+	char *payload;
 };
 
 static char *get_next_line(char **next, char *end)
 {
-    char *str = *next;
-    char *result = str;
+	char *str = *next;
+	char *result = str;
 
-    if (!str || *(str+1) == '\n')
-        return NULL;
+	if (!str || *(str+1) == '\n')
+		return NULL;
 
-    *next = NULL;
+	*next = NULL;
 
-    for (; str < end; ++str) {
-        if (*str == '\n') {
-            *str = '\0';
-            if (str + 1 < end && *(str + 1) != '\0')
-                *next = str + 1;
-            break;
-        }
-    }
+	for (; str < end; ++str) {
+		if (*str == '\n') {
+			*str = '\0';
+			if (str + 1 < end && *(str + 1) != '\0')
+				*next = str + 1;
+			break;
+		}
+	}
 
-    return result;
+	return result;
 }
 
 int parse_header(struct http_header *hdr,
-                 char *hdr_data,
-                 size_t size)
+		 char *hdr_data,
+		 size_t size)
 {
-    const struct request_metod *method;
-    char *i, *next, *end;
-    int result = -1;
+	const struct request_metod *method;
+	char *i, *next, *end;
+	int result = -1;
 
-    end = hdr_data + size;
-    next = hdr_data;
+	end = hdr_data + size;
+	next = hdr_data;
 
-    i = get_next_line(&next, end);
-    if (!i)
-        goto out;
-    if((i = strtok(i, " ")) == NULL)
-        goto out;
-    for (method = supported_methods; method != NULL; ++method) {
-        if (strncmp(i, method->name, strlen(method->name)) == 0) {
-            hdr->request_type = method->value;
-            break;
-        }
-    }
+	i = get_next_line(&next, end);
+	if (!i)
+		goto out;
+	if((i = strtok(i, " ")) == NULL)
+		goto out;
+	for (method = supported_methods; method != NULL; ++method) {
+		if (strncmp(i, method->name, strlen(method->name)) == 0) {
+			hdr->request_type = method->value;
+			break;
+		}
+	}
 
-    if((i = strtok(NULL, " ")) == NULL)
-        goto out;
-    hdr->request_path = i + 1;
-    /* We got enough header data */
-    result = 0;
+	if((i = strtok(NULL, " ")) == NULL)
+		goto out;
+	hdr->request_path = i + 1;
+	/* We got enough header data */
+	result = 0;
 
-    if ((i = get_next_line(&next, end)) == NULL)
-        goto out;
-    if((i = strtok(i, " ")) == NULL)
-        goto out;
-    if (strncmp(i, "Host:", strlen("Host:")) == 0) {
-        i = strtok(NULL, " ");
-        hdr->host = i;
-    }
+	if ((i = get_next_line(&next, end)) == NULL)
+		goto out;
+	if((i = strtok(i, " ")) == NULL)
+		goto out;
+	if (strncmp(i, "Host:", strlen("Host:")) == 0) {
+		i = strtok(NULL, " ");
+		hdr->host = i;
+	}
 
-    while ((i = get_next_line(&next, end))) {
-        char *token = strtok(i, " ");
-        int found = 0;
-        while (token) {
-            if (strncmp(token, "User-Agent:",
-                        strlen("User-Agent:")) == 0)
-                found = 1;
+	while ((i = get_next_line(&next, end))) {
+		char *token = strtok(i, " ");
+		int found = 0;
+		while (token) {
+			if (strncmp(token, "User-Agent:",
+				    strlen("User-Agent:")) == 0)
+				found = 1;
 
-            if (found) {
-                hdr->user_agent = token + strlen(token) + 1;
-                goto out;
-            } else {
-                token = strtok(NULL, " ");
-            }
-        }
-    }
+			if (found) {
+				hdr->user_agent = token + strlen(token) + 1;
+				goto out;
+			} else {
+				token = strtok(NULL, " ");
+			}
+		}
+	}
 
 out:
-    return result;
+	return result;
 }
 
 
 inline char *getfileext(const char *fname)
 {
-    char *ret = strrchr(fname, '.');
-    if (ret)
-        ret = ret + 1;
+	char *ret = strrchr(fname, '.');
+	if (ret)
+		ret = ret + 1;
 
-    return ret;
+	return ret;
 }
 
 int filename(char *buf, size_t size, const char *request_path)
 {
-    struct stat sb;
-    size_t len;
-    int isdir = 0;
+	struct stat sb;
+	size_t len;
+	int isdir = 0;
 
-    if (strstr(request_path, ".."))
-        return FORBIDDEN;
+	if (strstr(request_path, ".."))
+		return FORBIDDEN;
 
-    if (snprintf(buf, size, "%s/%s", doc_root, request_path) >= size)
-        return -1;
+	if (snprintf(buf, size, "%s/%s", doc_root, request_path) >= size)
+		return -1;
 
-    if (stat(buf, &sb) == 0)
-        isdir = S_ISDIR(sb.st_mode);
+	if (stat(buf, &sb) == 0)
+		isdir = S_ISDIR(sb.st_mode);
 
-    len = strlen(buf);
+	len = strlen(buf);
 
-    if (isdir) {
-        const char *dir_index;
+	if (isdir) {
+		const char *dir_index;
 
-        if (len > 0 && *(request_path + len - 1) == '/')
-            dir_index = "index.html";
-        else
-            dir_index = "/index.html";
-        if (snprintf(buf, size, "%s%s%s",
-                     doc_root,
-                     request_path,
-                     dir_index) >= size)
-            return -1;
-    } else {
-        if (snprintf(buf, size, "%s/%s", doc_root, request_path) >= size)
-            return -1;
-    }
+		if (len > 0 && *(request_path + len - 1) == '/')
+			dir_index = "index.html";
+		else
+			dir_index = "/index.html";
+		if (snprintf(buf, size, "%s%s%s",
+			     doc_root,
+			     request_path,
+			     dir_index) >= size)
+			return -1;
+	} else {
+		if (snprintf(buf, size, "%s/%s", doc_root, request_path) >= size)
+			return -1;
+	}
 
-    return OK;
+	return OK;
 }
 
 const char *mimestr(const char *file_name)
 {
-    const struct mime_type *m = supported_mime_types;
-    char *ext = getfileext(file_name);
-    size_t len;
+	const struct mime_type *m = supported_mime_types;
+	char *ext = getfileext(file_name);
+	size_t len;
 
-    if (ext) {
-        len = strlen(ext);
-        for (; m->ext != NULL; ++m)
-            if (strncmp(m->ext, ext, len) == 0)
-                return m->file_type;
-    }
+	if (ext) {
+		len = strlen(ext);
+		for (; m->ext != NULL; ++m)
+			if (strncmp(m->ext, ext, len) == 0)
+				return m->file_type;
+	}
 
-    return NULL;
+	return NULL;
 }
