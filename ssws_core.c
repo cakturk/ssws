@@ -192,17 +192,18 @@ int ssws_init(const char *port, const char *document_root)
 		size = read(cli_fd, app_buf.in_buf, BUFSIZE);
 
 		if (size > 0) {
+			pid_t pid;
+
 			app_buf.in_buf[size] = '\0';
 
-			pid_t pid = fork();
-			if (pid < 0)
+			if ((pid = fork()) < 0)
 				exit(EXIT_FAILURE);
 
 			/* child process */
 			if (pid == 0) {
-				close(sock_fd);
-
 				struct http_header header;
+
+				close(sock_fd);
 				parse_header(&header, app_buf.in_buf, BUFSIZE);
 				handle_request(cli_fd, &header, &app_buf);
 				printf("header:\n%d, %s, %s\n",

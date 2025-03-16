@@ -1,9 +1,11 @@
 #############################################################################
 # Makefile for building: ssws (simple stupid web server)
 #############################################################################
-CFLAGS = -g -O2 -Wall -pipe
+CFLAGS = -g -O2 -Wall -pipe -Wstrict-prototypes -Wdeclaration-after-statement \
+	 -fsanitize=address
 OBJECTS = main.o http_header_parser.o ssws_core.o
 PROGRAM = ssws
+CPPFLAGS := -D_FORTIFY_SOURCE=3
 
 ifndef ($(findstring $(MAKEFLAGS),s),s)
 ifndef V
